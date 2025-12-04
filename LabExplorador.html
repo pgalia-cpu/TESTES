@@ -1,0 +1,212 @@
+<style>
+  /* LAYOUT */
+  .exp-layout { 
+    display: grid; 
+    grid-template-columns: 280px 1fr; 
+    gap: 20px; 
+    height: 100%; 
+    max-width: 1600px; 
+    margin: 0 auto; 
+    overflow: hidden; 
+  }
+  
+  /* BARRA LATERAL */
+  .exp-sidebar { 
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; 
+    display: flex; flex-direction: column; gap: 15px; overflow-y: auto; 
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+  }
+  .exp-header { font-weight: 800; color: #1e293b; font-size: 1.1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  
+  .btn-calc { background: #8b5cf6; color: white; border: none; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:5px; transition:0.2s; box-shadow:0 2px 4px rgba(139, 92, 246, 0.2); }
+  .btn-calc:hover { background: #7c3aed; transform:scale(1.05); }
+  
+  .exp-group { display: flex; flex-direction: column; gap: 4px; }
+  .exp-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; }
+  .exp-select { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; font-size: 0.85rem; }
+  .btn-plot { background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 10px; }
+  .btn-plot:hover { background: #059669; }
+  
+  .exp-chart-area { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; position: relative; height: 100%; }
+  .calc-list { display:none; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+  .calc-item { padding:8px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; background:#f8fafc; font-size:0.8rem; }
+  
+  /* Toggle Switch */
+  .switch-container { display: flex; align-items: center; gap: 10px; background: #eff6ff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 5px; }
+  .switch-label { font-size: 0.8rem; font-weight: 600; color: #1e40af; cursor:pointer; flex:1; }
+  .switch-input { cursor: pointer; accent-color: #2563eb; width: 16px; height: 16px; }
+</style>
+
+<div class="exp-layout">
+  
+  <div class="exp-sidebar">
+    <div class="exp-header">
+      <span>🧭 Explorador</span>
+      <button class="btn-calc" onclick="openCalc()"><span>🧮</span> Calc</button>
+    </div>
+
+    <div id="custom-vars-list" class="calc-list"></div>
+
+    <div class="switch-container" title="Calcula a média para cada paciente">
+      <input type="checkbox" id="exp-unique" class="switch-input">
+      <label for="exp-unique" class="switch-label">👤 Agrupar por Paciente</label>
+    </div>
+
+    <div class="exp-group">
+      <label>1. Fonte de Dados</label>
+      <select id="exp-source" class="exp-select" onchange="loadExplorerColumns()"><option value="">Carregando...</option></select>
+    </div>
+
+    <div class="exp-group">
+      <label>2. Eixo X (Agrupador)</label>
+      <select id="exp-axis-x" class="exp-select" disabled><option>--</option></select>
+    </div>
+
+    <div class="exp-group">
+      <label>3. Eixo Y (Métrica)</label>
+      <select id="exp-axis-y" class="exp-select" disabled><option value="">(Contagem)</option></select>
+    </div>
+
+    <div class="exp-group">
+      <label>Gráfico</label>
+      <select id="exp-chart-type" class="exp-select">
+        <option value="bar">📊 Barra</option>
+        <option value="scatter">💠 Dispersão</option>
+        <option value="box">📦 Boxplot</option>
+        <option value="pie">🥧 Pizza</option>
+      </select>
+    </div>
+
+    <button class="btn-plot" id="btn-gen-exp" onclick="generateExplorerChart()">🚀 Plotar Gráfico</button>
+  </div>
+
+  <div class="exp-chart-area">
+    <div id="chart-explorer" style="width:100%; height:100%;"></div>
+  </div>
+</div>
+
+<script>
+  // Inicialização e Lógica
+  var explorerCols = [], customVars = [];
+
+  function initExploradorModule() {
+    loadCustomVars();
+    const coreSheet = document.getElementById('cfg-core-aba-fatos')?.value;
+    const sel = document.getElementById('exp-source');
+    if(coreSheet && sel) {
+      let exists = false;
+      for(let i=0; i<sel.options.length; i++) if(sel.options[i].value === coreSheet) exists = true;
+      if(!exists) sel.innerHTML += `<option value="${coreSheet}">${coreSheet}</option>`;
+      if(!sel.value) { sel.value = coreSheet; loadExplorerColumns(); }
+    }
+  }
+
+  function loadCustomVars() {
+    google.script.run.withSuccessHandler(vars => {
+      customVars = vars; renderCustomVarsList();
+      if(document.getElementById('exp-source').value) loadExplorerColumns();
+    }).apiGetVariaveisCustom();
+  }
+
+  function renderCustomVarsList() {
+    const div = document.getElementById('custom-vars-list');
+    if(customVars.length === 0) { div.style.display = 'none'; return; }
+    div.style.display = 'block';
+    div.innerHTML = `<div style="font-size:0.7rem; color:#64748b; padding:5px; font-weight:bold;">VARIÁVEIS ATIVAS:</div>`;
+    customVars.forEach(v => {
+      div.innerHTML += `<div class="calc-item"><div><div style="font-weight:700; color:#7c3aed;">${v.nome}</div></div><button onclick="deleteCustomVar('${v.nome}')" style="color:#ef4444; border:none; cursor:pointer;">&times;</button></div>`;
+    });
+  }
+  function deleteCustomVar(n) { if(confirm("Apagar?")) google.script.run.withSuccessHandler(loadCustomVars).apiExcluirVariavel(n); }
+
+  function loadExplorerColumns() {
+    const sheet = document.getElementById('exp-source').value;
+    const xSel = document.getElementById('exp-axis-x'), ySel = document.getElementById('exp-axis-y');
+    if(!sheet) return;
+    google.script.run.withSuccessHandler(cols => {
+      explorerCols = cols;
+      let opts = `<optgroup label="⚡ Minhas Vars">${customVars.map(v=>`<option value="${v.nome}" style="color:#7c3aed;font-weight:bold">${v.nome}</option>`).join('')}</optgroup>`;
+      opts += `<optgroup label="📋 Colunas">${cols.map(c=>`<option value="${c}">${c}</option>`).join('')}</optgroup>`;
+      xSel.innerHTML = opts; xSel.disabled = false;
+      ySel.innerHTML = '<option value="">(Contagem)</option>' + opts; ySel.disabled = false;
+    }).apiGetColumns(sheet);
+  }
+
+  function generateExplorerChart() {
+    const s = document.getElementById('exp-source').value;
+    const xKey = document.getElementById('exp-axis-x').value;
+    const yKey = document.getElementById('exp-axis-y').value;
+    const type = document.getElementById('exp-chart-type').value;
+    const isUnique = document.getElementById('exp-unique').checked;
+
+    if(!s || !xKey) return alert("Selecione os eixos.");
+    
+    const btn = document.getElementById('btn-gen-exp');
+    btn.innerText = "⏳ Processando..."; btn.disabled = true;
+
+    const colsToFetch = yKey ? [xKey, yKey] : [xKey];
+
+    google.script.run.withSuccessHandler(res => {
+      btn.innerText = "🚀 Plotar Gráfico"; btn.disabled = false;
+      if(!res.sucesso) return alert(res.erro);
+      
+      let finalData = res.dados;
+
+      // Lógica de Agrupamento
+      if (isUnique) {
+         const grouped = {};
+         finalData.forEach(row => {
+            const pid = row['_PID'];
+            if (!grouped[pid]) grouped[pid] = { count: 0, xVals: [], yVals: [] };
+            const g = grouped[pid];
+            g.count++;
+            if (row[xKey] !== undefined) g.xVals.push(row[xKey]);
+            if (yKey && row[yKey] !== undefined) g.yVals.push(row[yKey]);
+         });
+
+         finalData = Object.values(grouped).map(g => {
+            const reduceVal = (arr) => {
+               if(arr.length === 0) return null;
+               if(typeof arr[0] === 'number') return arr.reduce((a,b)=>a+b,0) / arr.length;
+               return arr[0];
+            };
+            return {
+               [xKey]: reduceVal(g.xVals),
+               [yKey]: yKey ? reduceVal(g.yVals) : g.count
+            };
+         });
+      }
+
+      // Plotagem
+      const xVals = finalData.map(d => d[xKey]);
+      const yVals = yKey ? finalData.map(d => d[yKey]) : null;
+      let trace = { type: type==='scatter'?'scatter':(type==='pie'?'pie':'bar'), mode: type==='scatter'?'markers':undefined };
+
+      if (!yKey) {
+         const counts = {}; xVals.forEach(x => { let k = (typeof x==='number') ? Math.floor(x) : String(x); counts[k]=(counts[k]||0)+1; });
+         trace.x = Object.keys(counts); trace.y = Object.values(counts);
+         trace.marker = {color: '#3b82f6'};
+      } else {
+         trace.x = xVals; trace.y = yVals;
+         trace.marker = {color: '#8b5cf6', opacity: 0.6};
+         trace.text = finalData.map(d => isUnique ? `Média: ${d[yKey]?.toFixed(1)}` : `Valor: ${d[yKey]}`);
+      }
+      
+      if(type==='pie') { trace.labels=trace.x; trace.values=trace.y; delete trace.x; delete trace.y; }
+      
+      const title = isUnique ? (yKey ? `Média de ${yKey} por ${xKey} (Por Paciente)` : `Pacientes Únicos por ${xKey}`) : (yKey ? `${yKey} por ${xKey}` : `Ocorrências de ${xKey}`);
+
+      Plotly.newPlot('chart-explorer', [trace], {title: title, margin:{t:40,b:80,l:40,r:20}}, {responsive:true});
+
+    }).apiGetRawExplorerData(s, colsToFetch);
+  }
+
+  // Atalhos
+  function openCalc() { if(typeof window.openCalcFunc === 'function') window.openCalcFunc(); else if(typeof openCalc === 'function') openCalc(); else alert("Calculadora indisponível."); }
+  // Define função global para o botão da calculadora encontrar
+  window.openCalcFunc = function() { 
+    const modal = document.getElementById('calc-modal');
+    const overlay = document.getElementById('calc-overlay');
+    if(modal && overlay) { modal.style.display='grid'; overlay.style.display='block'; if(typeof loadCalcData === 'function') loadCalcData(document.getElementById('exp-source').value); }
+  };
+</script>
