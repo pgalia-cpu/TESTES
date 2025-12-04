@@ -1,0 +1,82 @@
+<style>
+  /* ESTILOS DO RELATÓRIO IA */
+  .rep-modal { 
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    background: white; padding: 0; border-radius: 16px; 
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 700px; max-width: 90%;
+    z-index: 3000; border: none; display:none; /* Z-Index alto para ficar acima de tudo */
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+  }
+  .rep-overlay { 
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+    background: rgba(15, 23, 42, 0.6); z-index: 2999; display:none; 
+    backdrop-filter: blur(2px); 
+  }
+  
+  .rep-header { padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background: #f8fafc; border-radius: 16px 16px 0 0; }
+  .rep-body { padding: 30px; overflow-y: auto; max-height: 70vh; }
+  
+  .rep-box { margin-bottom: 20px; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .rep-box.summary { background: #f0f9ff; border-color: #bae6fd; color: #0369a1; }
+  
+  .rep-section-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 12px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+  .rep-item { display: flex; gap: 12px; align-items: start; font-size: 0.95rem; color: #334155; line-height: 1.5; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9; margin-bottom: 8px; }
+  .rep-item.ok { border-left: 4px solid #10b981; }
+  .rep-item.gap { border-left: 4px solid #f59e0b; }
+  
+  @keyframes popIn { from { opacity:0; transform:translate(-50%, -45%); } to { opacity:1; transform:translate(-50%, -50%); } }
+</style>
+
+<div class="rep-overlay" id="rep-overlay"></div>
+<dialog id="rep-modal" class="rep-modal">
+  <div class="rep-header">
+    <h3 style="margin:0; color:#1e293b;">🧠 Análise de Inteligência</h3>
+    <button onclick="closeAiReport()" style="border:none; background:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">&times;</button>
+  </div>
+  <div class="rep-body">
+    <div class="rep-box summary">
+      <strong>📋 Resumo Executivo:</strong>
+      <div id="rep-summary-text" style="margin-top:5px; font-size:1rem; line-height:1.5;">Carregando...</div>
+    </div>
+    <div style="margin-bottom:25px;">
+      <div class="rep-section-title">✅ Capacidades Detetadas</div>
+      <div id="rep-list-ok"></div>
+    </div>
+    <div>
+      <div class="rep-section-title" style="color:#b45309;">⚠️ Atenção (Limitações)</div>
+      <div id="rep-list-gap"></div>
+    </div>
+    <div style="margin-top:30px; text-align:center;">
+      <button onclick="closeAiReport()" style="background:#fff; border:1px solid #cbd5e1; padding:12px 30px; border-radius:8px; cursor:pointer; color:#475569; font-weight:600;">Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  function openAiReport() {
+    // Busca dados da variável global (do Dashboard)
+    const analysis = (typeof globalConfig !== 'undefined' && globalConfig.aiAnalysis) ? globalConfig.aiAnalysis : {};
+    
+    document.getElementById('rep-summary-text').innerText = globalConfig.studySummary || "Sem resumo disponível.";
+    
+    const divOk = document.getElementById('rep-list-ok');
+    divOk.innerHTML = '';
+    if (analysis.capabilities && analysis.capabilities.length > 0) {
+      analysis.capabilities.forEach(c => divOk.innerHTML += `<div class="rep-item ok"><span>✔</span><span>${c}</span></div>`);
+    } else divOk.innerHTML = '<div style="color:#94a3b8; font-style:italic;">Nada listado.</div>';
+
+    const divGap = document.getElementById('rep-list-gap');
+    divGap.innerHTML = '';
+    if (analysis.gaps && analysis.gaps.length > 0) {
+      analysis.gaps.forEach(g => divGap.innerHTML += `<div class="rep-item gap"><span>⚠️</span><span>${g}</span></div>`);
+    } else divGap.innerHTML = '<div style="color:#166534; background:#dcfce7; padding:10px; border-radius:8px;">✨ Nenhuma limitação crítica.</div>';
+
+    document.getElementById('rep-overlay').style.display = 'block';
+    document.getElementById('rep-modal').style.display = 'block';
+  }
+
+  function closeAiReport() {
+    document.getElementById('rep-overlay').style.display = 'none';
+    document.getElementById('rep-modal').style.display = 'none';
+  }
+</script>
