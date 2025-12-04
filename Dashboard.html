@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* DESIGN SYSTEM 5.2 */
+    :root { 
+      --primary: #2563eb; --bg: #f1f5f9; --sidebar-bg: #ffffff; 
+      --text: #0f172a; --border: #e2e8f0; 
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+    /* SIDEBAR */
+    aside { 
+      width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--border); 
+      display: flex; flex-direction: column; padding: 20px; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 40px; padding-left: 10px; }
+    .brand-logo { font-size: 1.5rem; }
+    .brand-name { font-weight: 800; font-size: 1.1rem; color: #1e293b; letter-spacing: -0.5px; }
+    
+    .nav-menu { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+    .nav-item { 
+      background: transparent; border: none; text-align: left; padding: 12px 15px; 
+      border-radius: 8px; cursor: pointer; color: #64748b; font-weight: 600; font-size: 0.9rem;
+      display: flex; align-items: center; gap: 12px; transition: all 0.2s;
+    }
+    .nav-item:hover { background: #f8fafc; color: var(--primary); }
+    .nav-item.active { background: #eff6ff; color: var(--primary); font-weight: 700; }
+    .nav-item:disabled { opacity: 0.5; cursor: not-allowed; }
+    .nav-divider { height: 1px; background: #e2e8f0; margin: 10px 0; }
+
+    /* MAIN CONTENT */
+    main { flex: 1; overflow-y: auto; padding: 0; position: relative; background: #f8fafc; opacity: 0; transition: opacity 0.5s ease; }
+    body.loaded main { opacity: 1; }
+    
+    /* TOP BAR */
+    .top-bar { 
+      height: 60px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+      border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 30px; position: sticky; top: 0; z-index: 5;
+    }
+    .study-tag { font-size: 0.85rem; font-weight: 600; color: #475569; background: #fff; border: 1px solid #cbd5e1; padding: 5px 12px; border-radius: 20px; }
+
+    .view-section { display: none; padding: 30px; }
+    .view-section.active { display: block; }
+
+    /* CONFIG & FORMS (Restaurados) */
+    .config-grid { display: grid; grid-template-columns: 1fr 320px; gap: 25px; max-width: 1500px; margin: 0 auto; }
+    .module-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; margin-bottom: 20px; overflow: hidden; }
+    .module-card.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+    .module-header { padding: 15px 25px; background: #f8fafc; font-weight: 700; border-bottom: 1px solid #e2e8f0; cursor: pointer; display: flex; justify-content: space-between; align-items:center; }
+    .module-body { padding: 25px; display: none; }
+    .module-card.active .module-body { display: block; }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    label { display: block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 5px; text-transform: uppercase; letter-spacing:0.5px; }
+    select, input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color:#1e293b; font-size:0.9rem; }
+    
+    /* UTILS */
+    .btn-action { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .btn-outline { width: 100%; background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; transition:0.2s; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+    /* WIZARD MODAL */
+    dialog#wizard-modal { border: none; border-radius: 20px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); max-width: 800px; width: 90%; padding: 0; background: #fff; }
+    dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px); }
+    .wiz-header { padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+    .wiz-body { padding: 30px; }
+    .wiz-tabs { display: flex; gap: 10px; margin-bottom: 25px; background: #f1f5f9; padding: 5px; border-radius: 12px; }
+    .wiz-tab { flex: 1; padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; font-weight: 600; color: #64748b; transition: 0.2s; font-size:0.9rem; }
+    .wiz-tab.active { background: #fff; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .wiz-drop { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 30px; background: #f8fafc; cursor: pointer; text-align: center; margin-bottom: 20px; transition:0.2s; }
+    .wiz-drop:hover { border-color: var(--primary); background: #eff6ff; }
+    .wiz-alert { background: #ecfdf5; color: #047857; padding: 15px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 20px; border: 1px solid #a7f3d0; display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+
+<?!= include('SplashScreen'); ?>
+
+<aside>
+  <div class="brand">
+    <span class="brand-logo">🚀</span>
+    <span class="brand-name">EUM Manager</span>
+  </div>
+  
+  <div class="nav-menu">
+    <button onclick="switchView('home')" class="nav-item active" id="btn-home"><span>🏠</span> Início</button>
+    <div class="nav-divider"></div>
+    <button onclick="switchView('explorador')" class="nav-item" id="btn-explorador"><span>🧭</span> Explorador</button>
+    <button onclick="switchView('eficacia')" class="nav-item" id="btn-eficacia" disabled><span>🧪</span> Eficácia</button>
+    <button onclick="switchView('seguranca')" class="nav-item" id="btn-seguranca" disabled><span>🛡️</span> Segurança</button>
+    <button onclick="switchView('fusao')" class="nav-item" id="btn-fusao"><span>⚗️</span> Fusão</button>
+    <div class="nav-divider"></div>
+    <button onclick="switchView('config')" class="nav-item" id="btn-config"><span>⚙️</span> Configuração</button>
+  </div>
+  
+  <div style="font-size:0.7rem; color:#94a3b8; text-align:center;">v5.2 Master</div>
+</aside>
+
+<main>
+  <div class="top-bar">
+    <div id="page-title" style="font-weight:700; font-size:1.1rem; color:#1e293b;">Página Inicial</div>
+    <div style="display:flex; gap:10px; align-items:center;">
+       <button onclick="openAiReport()" id="btn-report" style="display:none; border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:20px; padding:5px 12px; font-size:0.8rem; font-weight:600; cursor:pointer;">📄 Relatório IA</button>
+       <div id="study-badge" class="study-tag">Carregando...</div>
+    </div>
+  </div>
+
+  <section id="view-home" class="view-section active">
+    <?!= include('LabHome'); ?>
+  </section>
+
+  <section id="view-explorador" class="view-section">
+    <?!= include('LabExplorador'); ?>
+  </section>
+
+  <section id="view-config" class="view-section">
+    <div class="config-grid">
+      <div>
+        <h2 style="margin-bottom:25px; color:#1e293b; margin-top:0;">Mapeamento de Dados</h2>
+        <div class="module-card active" id="card-core">
+           <div class="module-header"><span style="color:#2563eb;">1. Núcleo (Obrigatório)</span></div>
+           <div class="module-body">
+              <div class="form-grid">
+                 <div><label>Aba Eventos</label><select id="cfg-core-aba-fatos" class="sheet-sel" onchange="loadCols(this.value, 'core-fatos')"></select></div>
+                 <div><label>Aba Pacientes</label><select id="cfg-core-aba-dim" class="sheet-sel" onchange="loadCols(this.value, 'core-dim')"></select></div>
+              </div>
+              <hr style="border:0; border-top:1px solid #f1f5f9; margin:20px 0;">
+              <div class="form-grid">
+                 <div><label>Medicamento</label><select id="cfg-core-col-med" class="col-core-fatos"></select></div>
+                 <div><label>Prontuário</label><select id="cfg-core-col-pront-fatos" class="col-core-fatos"></select></div>
+              </div>
+              <div style="background:#f0f9ff; padding:20px; border-radius:12px; margin-top:20px;">
+                 <label style="color:#1e40af; margin-bottom:15px; display:block;">Dados Clínicos</label>
+                 <div class="form-grid">
+                    <div><label>Peso</label><select id="cfg-core-col-peso" class="col-core-fatos"></select></div>
+                    <div><label>Altura</label><select id="cfg-core-col-altura" class="col-core-fatos"></select></div>
+                    <div><label>Creatinina</label><select id="cfg-core-col-creat" class="col-core-fatos"></select></div>
+                    <div><label style="color:#2563eb; font-weight:800;">★ TFG Híbrida</label><select id="cfg-core-col-tfg" class="col-core-fatos"></select></div>
+                 </div>
+              </div>
+              <div style="display:none">
+                 <select id="cfg-core-col-dt" class="col-core-fatos"></select><select id="cfg-core-col-dose-uni" class="col-core-fatos"></select>
+                 <select id="cfg-core-col-apraz" class="col-core-fatos"></select><select id="cfg-core-col-dose-24h" class="col-core-fatos"></select>
+                 <select id="cfg-core-col-pront-dim" class="col-core-dim"></select><select id="cfg-core-col-nasc" class="col-core-dim"></select><select id="cfg-core-col-sexo" class="col-core-dim"></select>
+              </div>
+           </div>
+        </div>
+        <div class="module-card" id="card-exames">
+           <div class="module-header" onclick="toggleModule('exames')"><span>2. Exames (Opcional)</span> <span style="color:#cbd5e1;">▼</span></div>
+           <div class="module-body">
+              <div style="margin-bottom:15px;"><label>Aba Exames</label><select id="cfg-ex-aba" class="sheet-sel" onchange="loadCols(this.value, 'exames')"></select></div>
+              <div class="form-grid">
+                 <select id="cfg-ex-col-pront" class="col-exames"><option>Prontuário...</option></select><select id="cfg-ex-col-nome" class="col-exames"><option>Nome Exame...</option></select>
+                 <select id="cfg-ex-col-valor" class="col-exames"><option>Valor...</option></select><select id="cfg-ex-col-data" class="col-exames"><option>Data...</option></select>
+              </div>
+           </div>
+        </div>
+        <div class="module-card" id="card-rams">
+           <div class="module-header" onclick="toggleModule('rams')"><span>3. Segurança (Opcional)</span> <span style="color:#cbd5e1;">▼</span></div>
+           <div class="module-body">
+              <div style="margin-bottom:15px;"><label>Aba RAMs</label><select id="cfg-ram-aba" class="sheet-sel" onchange="loadCols(this.value, 'rams')"></select></div>
+              <div class="form-grid">
+                 <select id="cfg-ram-col-grav" class="col-rams"><option>Gravidade...</option></select><select id="cfg-ram-col-caus" class="col-rams"><option>Causalidade...</option></select>
+              </div>
+           </div>
+        </div>
+      </div>
+      <div>
+        <button class="btn-action" style="width:100%; margin-bottom:25px;" onclick="saveCfg()">💾 Salvar Tudo</button>
+        <div class="card">
+           <h4 style="margin:0 0 15px 0; color:#1e293b;">Bancos de Dados</h4>
+           <button class="btn-outline" style="margin-bottom:10px;" onclick="document.getElementById('rules-modal').showModal()">📚 Regras de Exames</button>
+           <button class="btn-outline" onclick="document.getElementById('dose-modal').showModal()">💊 Regras de Doses</button>
+        </div>
+        <div class="card" style="background:#fffbeb; border:1px dashed #f59e0b;">
+           <h4 style="margin:0 0 10px 0; color:#b45309;">⚠️ Zona de Perigo</h4>
+           <button class="btn-outline" style="color:#b45309; border-color:#fcd34d; background:#fff;" onclick="openWizard()">♻️ Resetar Tudo</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <?!= include('LabCalculadora'); ?>
+  <?!= include('LabEficacia'); ?>
+  <?!= include('LabReferencias'); ?>
+  <?!= include('LabRegrasDose'); ?>
+  <?!= include('LabFusao'); ?>
+  <?!= include('LabSeguranca'); ?>
+  <?!= include('LabRelatorio'); ?>
+  <?!= include('Guia'); ?>
+
+</main>
+
+<dialog id="wizard-modal">
+  <div class="wiz-header"><h3 style="margin:0;color:#1e293b;">Novo Estudo com IA</h3><button onclick="document.getElementById('wizard-modal').close()" style="border:none;background:none;cursor:pointer;">&times;</button></div>
+  <div class="wiz-body">
+    <div style="margin-bottom:25px;">
+      <label style="font-weight:700;color:#475569;">1. Protocolo do Estudo (PDF)</label>
+      <div id="pdf-area" class="wiz-drop" onclick="document.getElementById('wiz-pdf').click()" style="padding:20px;margin-top:5px;">
+        <span id="pdf-label" style="font-weight:600;color:#2563eb;">📄 Clique para carregar PDF</span>
+      </div>
+      <input type="file" id="wiz-pdf" accept=".pdf" style="display:none" onchange="handlePdf(this.files)">
+    </div>
+    <div class="wiz-tabs">
+      <div class="wiz-tab active" id="tab-upload" onclick="setWizMode('upload')">📂 Upload Novo</div>
+      <div class="wiz-tab" id="tab-exist" onclick="setWizMode('exist')">📑 Usar Aba Existente</div>
+    </div>
+    <div id="mode-upload">
+      <div class="wiz-drop" onclick="document.getElementById('wiz-excel').click()">
+        <div style="font-size:2rem;margin-bottom:10px;">📊</div><div>Clique para carregar CSV/Excel</div>
+      </div>
+      <input type="file" id="wiz-excel" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleExcel(this.files)">
+    </div>
+    <div id="mode-exist" style="display:none;">
+      <div class="wiz-alert"><span style="font-size:1.5rem;">⚡</span><div><b>Modo Rápido:</b> Para abas já existentes no Google Sheets.</div></div>
+      <label>Selecione a Aba de Dados:</label>
+      <div style="display:flex;gap:5px;margin-top:5px;">
+        <select id="wiz-sheet-sel" style="flex:1;padding:12px;border-radius:12px;border:1px solid #cbd5e1;font-size:1rem;"></select>
+        <button onclick="refreshSheets()" style="border:1px solid #cbd5e1;background:#fff;border-radius:12px;cursor:pointer;">🔄</button>
+      </div>
+    </div>
+    <div id="wiz-status" style="margin-top:20px;color:#2563eb;font-weight:600;min-height:20px;text-align:center;"></div>
+    <button id="wiz-btn" class="btn-action" style="width:100%;margin-top:10px;display:none;padding:15px;font-size:1rem;" onclick="runWiz()">🚀 Analisar com IA</button>
+    <div id="wiz-loader" style="display:none;text-align:center;margin-top:15px;color:#64748b;">A IA está a pensar...</div>
+  </div>
+</dialog>
+
+<script>
+  let globalConfig = {}, allSheets = [], wizFiles = {pdf:null, matrix:null, name:null}, wizMode = 'upload';
+
+  window.onload = function() {
+    if (typeof startSplashSequence === 'function') {
+      startSplashSequence(mode => {
+        document.body.classList.add('loaded');
+        google.script.run.withSuccessHandler(initApp).apiGetInitialState();
+        if(mode === 'new') setTimeout(openWizard, 500);
+      });
+    } else {
+       google.script.run.withSuccessHandler(initApp).apiGetInitialState();
+    }
+  };
+
+  function initApp(state) {
+    if(!state) return;
+    globalConfig = state.config || {}; allSheets = state.sheets || [];
+    document.getElementById('study-badge').innerText = globalConfig.studyName || "Carregando...";
+    refreshSheets();
+    
+    // Atualiza Sidebar
+    if(state.status.hasCore) {
+      document.getElementById('btn-eficacia').disabled = false;
+      document.getElementById('btn-seguranca').disabled = false;
+      document.getElementById('btn-report').style.display = 'block';
+      if(typeof renderHomeHubData === 'function') renderHomeHubData(); // Se LabHome estiver carregado
+    } else {
+      if(typeof initHome === 'function') initHome(globalConfig, state.status); // Reseta para Hero mode
+    }
+
+    // Inicializa Views Específicas
+    if(typeof initHome === 'function') initHome(globalConfig, state.status);
+    if(typeof initExploradorModule === 'function') initExploradorModule();
+    
+    // Preenche forms de config
+    if(globalConfig.core) fillCoreForm(globalConfig.core);
+    if(globalConfig.exames) { document.getElementById('cfg-ex-aba').value=globalConfig.exames.aba; if(globalConfig.exames.aba) loadCols(globalConfig.exames.aba,'exames'); }
+  }
+
+  function switchView(v) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-'+v).classList.add('active');
+    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.getElementById('page-title').innerText = v.charAt(0).toUpperCase() + v.slice(1);
+    if(v==='explorador' && typeof initExploradorModule === 'function') initExploradorModule();
+  }
+
+  // WIZARD
+  function openWizard() { document.getElementById('wizard-modal').showModal(); refreshSheets(); resetWiz(); }
+  function resetWiz() { wizFiles={pdf:null,matrix:null}; document.getElementById('pdf-label').innerText='📄 Carregar PDF'; document.getElementById('pdf-area').style.background='#f8fafc'; document.getElementById('wiz-status').innerText=''; document.getElementById('wiz-btn').style.display='none'; }
+  function setWizMode(m) { wizMode = m; document.getElementById('tab-upload').className = m==='upload' ? 'wiz-tab active' : 'wiz-tab'; document.getElementById('tab-exist').className = m==='exist' ? 'wiz-tab active' : 'wiz-tab'; document.getElementById('mode-upload').style.display = m==='upload' ? 'block' : 'none'; document.getElementById('mode-exist').style.display = m==='exist' ? 'block' : 'none'; checkWizReady(); }
+  function handlePdf(f) { if(f[0]) { const r=new FileReader(); r.onload=e=>{wizFiles.pdf=e.target.result.split(',')[1]; document.getElementById('pdf-label').innerText='✅ PDF Pronto'; document.getElementById('pdf-area').style.background='#ecfdf5'; checkWizReady();}; r.readAsDataURL(f[0]); } }
+  function handleExcel(f) { if(f[0]) { wizFiles.name=f[0].name; const r=new FileReader(); r.onload=e=>{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); wizFiles.matrix=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1}); document.getElementById('wiz-status').innerText='✅ Excel ('+wizFiles.matrix.length+' linhas)'; checkWizReady(); }; r.readAsArrayBuffer(f[0]); } }
+  function checkWizReady() { let ready=false; if(wizFiles.pdf) { if(wizMode==='upload'&&wizFiles.matrix) ready=true; if(wizMode==='exist'&&document.getElementById('wiz-sheet-sel').value) ready=true; } document.getElementById('wiz-btn').style.display=ready?'inline-block':'none'; }
+  
+  function runWiz() { 
+    const s=wizMode==='exist'?document.getElementById('wiz-sheet-sel').value:null; 
+    document.getElementById('wiz-loader').style.display='block'; document.getElementById('wiz-btn').style.display='none'; 
+    google.script.run.withSuccessHandler(res=>{ 
+        document.getElementById('wizard-modal').close(); 
+        document.getElementById('wiz-loader').style.display='none'; 
+        if(res.erro)return alert(res.erro); 
+        
+        if(res.createdSheet&&!allSheets.includes(res.createdSheet))allSheets.unshift(res.createdSheet); 
+        globalConfig.studyName=res.studyName; 
+        globalConfig.studySummary=res.studySummary; 
+        globalConfig.aiAnalysis=res.analysis; 
+        
+        // ★ ATUALIZA A HOME E ABRE RELATÓRIO
+        initApp({config:globalConfig, status:{hasCore:true}});
+        if(typeof openAiReport === 'function') openAiReport();
+
+        // AUTO-FILL
+        setVal('cfg-core-aba-fatos',res.createdSheet); 
+        loadCols(res.createdSheet,'core-fatos'); 
+        setTimeout(()=>{ 
+           const m=res.mapping||{}; 
+           setVal('cfg-core-col-med',m.colMed); setVal('cfg-core-col-pront-fatos',m.colProntFatos); 
+           setVal('cfg-core-col-peso',m.colPeso); setVal('cfg-core-col-altura',m.colAltura); 
+           setVal('cfg-core-col-creat',m.colCreat); setVal('cfg-core-col-tfg',m.colTfgPreCalc); 
+           // Ocultos
+           setVal('cfg-core-col-dt',m.colDtIni); setVal('cfg-core-col-dose-uni',m.colDoseUni); 
+           setVal('cfg-core-col-apraz',m.colApraz); setVal('cfg-core-col-dose-24h',m.colDose24h); 
+           setVal('cfg-core-col-pront-dim',m.colProntDim); setVal('cfg-core-col-nasc',m.colNasc); setVal('cfg-core-col-sexo',m.colSexo); 
+           
+           alert("✨ Análise Concluída!\nConfira o mapeamento na Configuração.");
+           switchView('config');
+        },2000); 
+    }).apiMagicSetup(wizFiles.pdf,wizFiles.matrix,wizFiles.name,s); 
+  }
+
+  // HELPERS GERAIS
+  function refreshSheets() { document.querySelectorAll('.sheet-sel, #wiz-sheet-sel').forEach(el=>{ const v=el.value; el.innerHTML='<option value="">Selecione...</option>'; allSheets.forEach(n=>el.innerHTML+=`<option value="${n}">${n}</option>`); if(v) el.value=v; }); }
+  function loadCols(s,t) { if(!s)return; google.script.run.withSuccessHandler(c=>{ document.querySelectorAll('.col-'+t).forEach(el=>{ const v=el.value; el.innerHTML='<option value="">Selecione...</option>'; c.forEach(o=>el.innerHTML+=`<option value="${o}">${o}</option>`); if(v) el.value=v; }); }).apiGetColumns(s); }
+  function fillCoreForm(c) { setVal('cfg-core-aba-fatos',c.abaFatos); setVal('cfg-core-aba-dim',c.abaDim); if(c.abaFatos) loadCols(c.abaFatos,'core-fatos'); setTimeout(()=>{setVal('cfg-core-col-med',c.colMed); setVal('cfg-core-col-pront-fatos',c.colProntFatos); setVal('cfg-core-col-peso',c.colPeso); setVal('cfg-core-col-altura',c.colAltura); setVal('cfg-core-col-creat',c.colCreat); setVal('cfg-core-col-tfg',c.colTfgPreCalc); setVal('cfg-core-col-dt',c.colDtIni); setVal('cfg-core-col-dose-uni',c.colDoseUni); setVal('cfg-core-col-apraz',c.colApraz); setVal('cfg-core-col-dose-24h',c.colDose24h); setVal('cfg-core-col-pront-dim',c.colProntDim); setVal('cfg-core-col-nasc',c.colNasc); setVal('cfg-core-col-sexo',c.colSexo);},1000); }
+  function saveCfg() { const c={studyName:globalConfig.studyName,studySummary:globalConfig.studySummary,aiAnalysis:globalConfig.aiAnalysis,core:{abaFatos:val('cfg-core-aba-fatos'),abaDim:val('cfg-core-aba-dim'),colMed:val('cfg-core-col-med'),colProntFatos:val('cfg-core-col-pront-fatos'),colPeso:val('cfg-core-col-peso'),colAltura:val('cfg-core-col-altura'),colCreat:val('cfg-core-col-creat'),colTfgPreCalc:val('cfg-core-col-tfg'),colDtIni:val('cfg-core-col-dt'),colDoseUni:val('cfg-core-col-dose-uni'),colApraz:val('cfg-core-col-apraz'),colDose24h:val('cfg-core-col-dose-24h'),colProntDim:val('cfg-core-col-pront-dim'),colNasc:val('cfg-core-col-nasc'),colSexo:val('cfg-core-col-sexo')},exames:{active:document.getElementById('card-exames').classList.contains('active'),aba:val('cfg-ex-aba'),colPront:val('cfg-ex-col-pront'),colNome:val('cfg-ex-col-nome'),colValor:val('cfg-ex-col-valor'),colData:val('cfg-ex-col-data')},rams:{active:document.getElementById('card-rams').classList.contains('active'),aba:val('cfg-ram-aba'),colGrav:val('cfg-ram-col-grav'),colCaus:val('cfg-ram-col-caus')}}; google.script.run.withSuccessHandler(r=>{if(r.sucesso){alert("Salvo!"); globalConfig=c; initApp({config:c,status:r.status});}else alert(r.erro);}).apiSaveConfig(c); }
+  function val(id) { const e=document.getElementById(id); return e?e.value:null; }
+  function setVal(id,v) { const e=document.getElementById(id); if(e&&v) e.value=v; }
+  function toggleModule(m) { document.getElementById('card-'+m).classList.toggle('active'); }
+</script>
+
+</body>
+</html>
