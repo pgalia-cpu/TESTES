@@ -1,0 +1,115 @@
+<style>
+  /* HERO SECTION */
+  .home-container { 
+    max-width: 1200px; margin: 0 auto; padding: 40px 20px; 
+    animation: fadeIn 0.4s ease-out; 
+  }
+  
+  .home-header { text-align: center; margin-bottom: 50px; }
+  .home-title { font-size: 2.5rem; color: #1e293b; margin-bottom: 10px; font-weight: 800; letter-spacing: -0.02em; }
+  .home-subtitle { color: #64748b; font-size: 1.1rem; max-width: 600px; margin: 0 auto; line-height: 1.5; }
+
+  /* CARDS GRID */
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-bottom: 40px; }
+  
+  .action-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 30px;
+    cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 15px;
+  }
+  .action-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #cbd5e1; }
+  
+  .card-icon { font-size: 2.5rem; background: #f1f5f9; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 5px; }
+  .card-title { font-size: 1.2rem; font-weight: 700; color: #334155; margin:0; }
+  .card-desc { font-size: 0.9rem; color: #64748b; line-height: 1.4; }
+  
+  /* ESTADO DE "ZERO DADOS" (HERO MODE) */
+  .empty-state { padding: 60px; border: 2px dashed #cbd5e1; border-radius: 20px; text-align: center; background: #f8fafc; }
+  
+  /* HUB DE STATUS (Quando já existe estudo) */
+  .status-panel { background: #fff; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0; display:none; }
+  .status-header { background: #f8fafc; padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+  .status-body { padding: 30px; display:grid; grid-template-columns: 2fr 1fr; gap:30px; }
+  
+  .ai-summary-box { background: #eff6ff; border: 1px solid #bfdbfe; padding: 20px; border-radius: 12px; color: #1e3a8a; line-height: 1.6; }
+</style>
+
+<div id="home-view" class="home-container">
+  
+  <div class="home-header">
+    <div class="home-title">Inteligência Clínica 5.0</div>
+    <div class="home-subtitle">Plataforma de análise farmacoterapêutica com motor híbrido e inteligência artificial.</div>
+  </div>
+
+  <div id="hero-mode" class="empty-state">
+    <div style="font-size:3rem; margin-bottom:15px;">✨</div>
+    <h3 style="color:#334155; margin-bottom:10px;">Começar Novo Estudo</h3>
+    <p style="color:#64748b; margin-bottom:25px;">Importe seus dados e protocolo para análise automática.</p>
+    <button class="btn-action" style="padding:15px 30px; font-size:1.1rem;" onclick="openWizard()">🚀 Iniciar Wizard IA</button>
+  </div>
+
+  <div id="dashboard-mode" style="display:none;">
+    
+    <div class="home-grid">
+      <div class="action-card" onclick="switchView('explorador')">
+        <div class="card-icon" style="background:#eff6ff; color:#2563eb;">🧭</div>
+        <h3 class="card-title">Explorador</h3>
+        <p class="card-desc">Visualize dados, crie gráficos e use a calculadora sandbox.</p>
+      </div>
+      
+      <div class="action-card" onclick="openAiReport()">
+        <div class="card-icon" style="background:#f0fdf4; color:#16a34a;">🧠</div>
+        <h3 class="card-title">Relatório IA</h3>
+        <p class="card-desc">Ver a análise de compatibilidade e insights gerados.</p>
+      </div>
+
+      <div class="action-card" onclick="openWizard()">
+        <div class="card-icon" style="background:#fff7ed; color:#ea580c;">♻️</div>
+        <h3 class="card-title">Reconfigurar</h3>
+        <p class="card-desc">Reiniciar o estudo ou carregar novos dados.</p>
+      </div>
+    </div>
+
+    <div class="status-panel" id="status-panel-box">
+      <div class="status-header">
+        <h3 style="margin:0; color:#1e293b;">📊 Estado do Estudo</h3>
+        <span class="tag-ver">Ativo</span>
+      </div>
+      <div class="status-body">
+        <div>
+          <h4 style="margin-top:0; color:#64748b;">RESUMO EXECUTIVO</h4>
+          <div id="home-ai-summary" class="ai-summary-box">Carregando resumo...</div>
+        </div>
+        <div>
+          <h4 style="margin-top:0; color:#64748b;">CAPACIDADES</h4>
+          <div id="home-checklist" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Função chamada pelo Dashboard ao iniciar
+  function initHome(config, status) {
+    if (status.hasCore) {
+      document.getElementById('hero-mode').style.display = 'none';
+      document.getElementById('dashboard-mode').style.display = 'block';
+      document.getElementById('status-panel-box').style.display = 'block';
+      
+      // Preenche dados
+      document.getElementById('home-ai-summary').innerText = config.studySummary || "Sem resumo disponível.";
+      
+      const list = document.getElementById('home-checklist');
+      list.innerHTML = '';
+      (config.aiAnalysis?.capabilities || []).slice(0, 4).forEach(c => {
+        list.innerHTML += `<div style="color:#166534; display:flex; gap:8px; align-items:center;"><span>✔</span> ${c}</div>`;
+      });
+      
+    } else {
+      document.getElementById('hero-mode').style.display = 'block';
+      document.getElementById('dashboard-mode').style.display = 'none';
+    }
+  }
+</script>
