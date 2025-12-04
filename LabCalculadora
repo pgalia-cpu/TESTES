@@ -1,0 +1,259 @@
+<style>
+  /* MODAL EXPANDIDO (Versão 4.0) */
+  .calc-modal { 
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    background: white; border-radius: 16px; 
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 900px; height: 600px;
+    z-index: 2000; border: 1px solid #e2e8f0; display:none; 
+    grid-template-columns: 250px 1fr; overflow:hidden;
+    animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+  }
+  .calc-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); z-index: 1999; display:none; backdrop-filter: blur(2px); }
+  
+  /* LADO ESQUERDO: COLUNAS */
+  .calc-sidebar { background: #f8fafc; border-right: 1px solid #e2e8f0; padding: 20px; display:flex; flex-direction:column; gap:10px; }
+  .col-search { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; margin-bottom:10px; }
+  .col-list { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:5px; }
+  .tag-col { 
+    background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 6px 10px; 
+    border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition:0.1s; 
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .tag-col:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+  .tag-col small { font-size:0.7em; color:#94a3b8; }
+
+  /* LADO DIREITO: EDITOR */
+  .calc-main { padding: 25px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; }
+  .ai-prompt-box { 
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%); border: 1px solid #bfdbfe; 
+    padding: 15px; border-radius: 12px; display:flex; gap:10px; align-items:center;
+  }
+  .ai-input { flex:1; border:1px solid #dbeafe; padding:10px; border-radius:8px; font-size:0.9rem; }
+  .btn-magic { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px rgba(37,99,235,0.2); }
+  .btn-magic:hover { transform: translateY(-1px); box-shadow: 0 6px 8px rgba(37,99,235,0.3); }
+
+  .formula-area textarea { 
+    width: 100%; height: 100px; padding: 15px; border: 1px solid #cbd5e1; 
+    border-radius: 8px; font-family: 'Courier New', monospace; font-size: 1rem; color: #1e293b;
+    background: #fff; line-height: 1.5;
+  }
+  
+  /* TESTER AREA */
+  .tester-box { background: #1e293b; color: #f1f5f9; padding: 15px; border-radius: 12px; font-family: monospace; font-size: 0.85rem; }
+  .test-row { display:flex; justify-content:space-between; border-bottom:1px solid #334155; padding:5px 0; }
+  .test-row:last-child { border:none; }
+  .res-val { color: #4ade80; font-weight:bold; }
+  .res-err { color: #f87171; }
+
+  /* TOOLTIP DE INSPEÇÃO */
+  .col-tooltip {
+    position: fixed; background: #1e293b; color: #fff; padding: 10px; border-radius: 8px;
+    font-size: 0.75rem; z-index: 2100; display:none; pointer-events:none; box-shadow: 0 10px 15px rgba(0,0,0,0.3);
+    max-width: 200px;
+  }
+
+  @keyframes popIn { from { transform: translate(-50%, -40%) scale(0.95); opacity:0; } to { transform: translate(-50%, -50%) scale(1); opacity:1; } }
+</style>
+
+<div class="calc-overlay" id="calc-overlay"></div>
+
+<div id="col-tooltip" class="col-tooltip"></div>
+
+<div class="calc-modal" id="calc-modal">
+  
+  <div class="calc-sidebar">
+    <h4 style="margin:0; color:#64748b;">Variáveis</h4>
+    <input type="text" class="col-search" placeholder="🔍 Filtrar..." onkeyup="filterCols(this.value)">
+    <div id="calc-col-list" class="col-list">
+      </div>
+  </div>
+
+  <div class="calc-main">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0; color:#1e293b;">🧮 Construtor de Lógica</h2>
+      <button onclick="closeCalc()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">&times;</button>
+    </div>
+
+    <div class="ai-prompt-box">
+      <span style="font-size:1.5rem;">✨</span>
+      <input type="text" id="ai-formula-prompt" class="ai-input" placeholder="Ex: Se idade < 18, usar altura / 100, senão usar 1.75">
+      <button class="btn-magic" onclick="askAiFormula()">Gerar</button>
+    </div>
+
+    <div class="formula-area">
+      <div style="display:flex; gap:10px; margin-bottom:5px;">
+        <input type="text" id="calc-name" placeholder="NOME_VARIAVEL" style="flex:1; font-weight:700; text-transform:uppercase; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+      </div>
+      <textarea id="calc-formula" placeholder="Sua fórmula aparecerá aqui..." onkeyup="previewCalc()"></textarea>
+      <div style="font-size:0.75rem; color:#64748b; margin-top:5px; text-align:right;">
+        Suporta Javascript simples: <code>Math.pow()</code>, <code>toFixed(2)</code>, etc.
+      </div>
+    </div>
+
+    <div>
+      <h4 style="margin:0 0 10px 0; color:#64748b;">🧪 Pré-visualização em Tempo Real (3 Casos Aleatórios)</h4>
+      <div id="calc-tester" class="tester-box">
+        <div style="color:#94a3b8; text-align:center;">Digite uma fórmula para testar...</div>
+      </div>
+    </div>
+
+    <button class="btn-magic" style="margin-top:auto; width:100%; padding:15px; font-size:1rem;" onclick="saveCalcVar()">💾 Salvar Regra no Sistema</button>
+  </div>
+</div>
+
+<script>
+  let sampleData = []; // Amostra de 5 linhas para teste e inspeção
+
+  function openCalc() {
+    const s = document.getElementById('exp-source').value;
+    if(!s) return alert("Selecione uma Fonte de Dados no Explorador primeiro.");
+    
+    document.getElementById('calc-overlay').style.display='block';
+    document.getElementById('calc-modal').style.display='grid';
+    
+    // Carrega colunas e uma amostra de dados para o "Inspetor"
+    loadCalcData(s);
+  }
+  
+  function closeCalc() {
+    document.getElementById('calc-overlay').style.display='none';
+    document.getElementById('calc-modal').style.display='none';
+    document.getElementById('col-tooltip').style.display='none';
+  }
+
+  function loadCalcData(sheet) {
+    const div = document.getElementById('calc-col-list');
+    div.innerHTML = '<div style="color:#94a3b8; text-align:center;">Carregando dados...</div>';
+    
+    // Pede ao backend: Colunas + Amostra de 5 linhas
+    google.script.run.withSuccessHandler(res => {
+      sampleData = res.sample; // Guarda para o testador
+      renderColList(res.columns);
+    }).apiGetExplorerSample(sheet);
+  }
+
+  function renderColList(cols) {
+    const div = document.getElementById('calc-col-list');
+    div.innerHTML = '';
+    
+    // Variáveis Virtuais Fixas
+    div.innerHTML += createTag('_IDADE_ANOS', 'Virtual', 'Calculado hoje');
+    
+    // Colunas Reais
+    cols.forEach(c => {
+       // Tenta achar um valor de exemplo na amostra
+       let ex = sampleData[0] ? sampleData[0][c] : '';
+       div.innerHTML += createTag(c, 'Coluna', ex);
+    });
+  }
+
+  function createTag(name, type, example) {
+    return `
+      <div class="tag-col" onclick="insertTag('${name}')" 
+           onmouseover="showTooltip(event, '${name}', '${example}')" 
+           onmouseout="hideTooltip()">
+        <strong>${name}</strong>
+        <small>${type}</small>
+      </div>`;
+  }
+
+  // --- FERRAMENTAS ---
+  function insertTag(tag) {
+    const field = document.getElementById('calc-formula');
+    field.value += `[${tag}]`;
+    field.focus();
+    previewCalc(); // Atualiza teste
+  }
+
+  function filterCols(term) {
+    const t = term.toLowerCase();
+    document.querySelectorAll('.tag-col').forEach(el => {
+      el.style.display = el.innerText.toLowerCase().includes(t) ? 'flex' : 'none';
+    });
+  }
+
+  // --- INSPECTOR (TOOLTIP) ---
+  function showTooltip(e, name, ex) {
+    const tt = document.getElementById('col-tooltip');
+    tt.innerHTML = `<strong>${name}</strong><br>Exemplo: <span style="color:#4ade80">${ex}</span>`;
+    tt.style.display = 'block';
+    tt.style.left = (e.pageX + 15) + 'px';
+    tt.style.top = (e.pageY + 15) + 'px';
+  }
+  function hideTooltip() { document.getElementById('col-tooltip').style.display='none'; }
+
+  // --- IA GENERATIVA ---
+  function askAiFormula() {
+    const prompt = document.getElementById('ai-formula-prompt').value;
+    if(!prompt) return;
+    
+    const btn = document.querySelector('.ai-prompt-box button');
+    const oldText = btn.innerText;
+    btn.innerText = "⏳"; btn.disabled = true;
+
+    // Envia colunas disponíveis para a IA saber o contexto
+    const cols = Object.keys(sampleData[0] || {});
+    
+    google.script.run.withSuccessHandler(res => {
+      btn.innerText = oldText; btn.disabled = false;
+      if(res.formula) {
+        document.getElementById('calc-formula').value = res.formula;
+        previewCalc(); // Testa logo em seguida
+      } else {
+        alert("IA não conseguiu gerar. Tente ser mais específico.");
+      }
+    }).apiGerarFormulaIA(prompt, cols);
+  }
+
+  // --- TESTADOR EM TEMPO REAL ---
+  function previewCalc() {
+    const formula = document.getElementById('calc-formula').value;
+    const box = document.getElementById('calc-tester');
+    
+    if(!formula || sampleData.length === 0) {
+      box.innerHTML = '<div style="color:#94a3b8; text-align:center;">Aguardando fórmula...</div>';
+      return;
+    }
+
+    box.innerHTML = '';
+    
+    // Testa nas 3 primeiras linhas da amostra
+    sampleData.slice(0, 3).forEach((row, i) => {
+      let fReady = formula;
+      // Substituição simples (igual ao backend)
+      Object.keys(row).forEach(k => {
+         // Regex global replace para substituir todas as ocorrências de [COLUNA]
+         fReady = fReady.split(`[${k}]`).join(row[k]);
+      });
+      // Também substitui variáveis virtuais (exemplo simples)
+      fReady = fReady.split(`[_IDADE_ANOS]`).join(row['_IDADE_ANOS'] || 25); // Mock idade se faltar
+
+      try {
+        const res = eval(fReady);
+        box.innerHTML += `
+          <div class="test-row">
+            <span>Paciente ${row['PRONTUARIO'] || i+1}</span>
+            <span class="res-val">${typeof res === 'number' ? res.toFixed(2) : res}</span>
+          </div>`;
+      } catch(e) {
+        box.innerHTML += `
+          <div class="test-row">
+            <span>Linha ${i+1}</span>
+            <span class="res-err">Erro: ${e.message}</span>
+          </div>`;
+      }
+    });
+  }
+
+  function saveCalcVar() {
+    const nome = document.getElementById('calc-name').value;
+    const form = document.getElementById('calc-formula').value;
+    if(!nome || !form) return alert("Preencha Nome e Fórmula.");
+    
+    google.script.run.withSuccessHandler(() => {
+      closeCalc();
+      if(typeof loadCustomVars === 'function') loadCustomVars(); // Atualiza o Explorador
+      alert("Regra Salva!");
+    }).apiSalvarVariavel(nome, form);
+  }
+</script>
